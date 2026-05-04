@@ -1,0 +1,1104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Automatic Differentiation — Interactive Demo</title>
+<style>
+:root {
+  --bg: #f8fafc; --surface: #fff; --border: #e2e8f0;
+  --text: #1e293b; --muted: #64748b;
+  --primary: #6366f1; --primary-light: #eef2ff;
+  --fwd: #059669; --fwd-light: #ecfdf5;
+  --bwd: #dc2626; --bwd-light: #fef2f2;
+  --radius: 12px;
+  --shadow: 0 1px 3px rgba(0,0,0,.1),0 4px 6px rgba(0,0,0,.05);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;min-height:100vh}
+header{background:linear-gradient(135deg,#1e1b4b,#312e81 50%,#1e40af);color:#fff;padding:2.5rem 2rem 1.5rem;text-align:center}
+header h1{font-size:2rem;font-weight:800;letter-spacing:-.02em;margin-bottom:.35rem}
+header p{opacity:.75;font-size:.95rem}
+.tabs{display:flex;justify-content:center;background:#312e81;padding:0 1rem;overflow-x:auto;gap:0}
+.tab-btn{padding:.8rem 1.4rem;background:none;border:none;color:rgba(255,255,255,.6);cursor:pointer;font-size:.875rem;font-weight:500;border-bottom:3px solid transparent;transition:all .2s;white-space:nowrap;font-family:inherit}
+.tab-btn:hover{color:rgba(255,255,255,.9)}
+.tab-btn.active{color:#fff;border-bottom-color:#a5b4fc}
+main{max-width:1080px;margin:0 auto;padding:2rem}
+.tab-pane{display:none}.tab-pane.active{display:block}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.5rem;box-shadow:var(--shadow);margin-bottom:1.5rem}
+.card-title{font-size:1rem;font-weight:700;margin-bottom:.2rem}
+.card-sub{font-size:.825rem;color:var(--muted);margin-bottom:1rem}
+h2{font-size:1.4rem;font-weight:700;margin-bottom:.4rem}
+h3{font-size:1.05rem;font-weight:600;margin-bottom:.6rem}
+p{margin-bottom:.7rem;color:var(--text)}p:last-child{margin-bottom:0}
+.note{background:var(--primary-light);border-left:4px solid var(--primary);padding:.7rem 1rem;border-radius:0 8px 8px 0;margin:.75rem 0;font-size:.9rem}
+.note.green{background:var(--fwd-light);border-color:var(--fwd)}
+.note.red{background:var(--bwd-light);border-color:var(--bwd)}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem}
+@media(max-width:680px){.grid-2,.grid-3{grid-template-columns:1fr}}
+.ctrl{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;margin-bottom:1rem}
+label{font-size:.8rem;font-weight:600;color:var(--muted);display:block;margin-bottom:.2rem}
+input[type=text],input[type=number],select{border:1.5px solid var(--border);border-radius:8px;padding:.45rem .7rem;font-size:.875rem;font-family:inherit;color:var(--text);background:var(--surface);outline:none;transition:border-color .15s}
+input[type=text]:focus,input[type=number]:focus,select:focus{border-color:var(--primary)}
+input[type=range]{accent-color:var(--primary);width:130px;cursor:pointer}
+.btn{padding:.45rem 1.1rem;border-radius:8px;border:none;cursor:pointer;font-size:.85rem;font-weight:600;font-family:inherit;transition:all .15s;display:inline-flex;align-items:center;gap:.35rem}
+.btn-p{background:var(--primary);color:#fff}.btn-p:hover{background:#4f46e5}.btn-p:disabled{background:#a5b4fc;cursor:not-allowed}
+.btn-g{background:var(--fwd);color:#fff}.btn-g:hover{background:#047857}.btn-g:disabled{background:#6ee7b7;cursor:not-allowed}
+.btn-r{background:var(--bwd);color:#fff}.btn-r:hover{background:#b91c1c}.btn-r:disabled{background:#fca5a5;cursor:not-allowed}
+.btn-o{background:#fff;color:var(--text);border:1.5px solid var(--border)}.btn-o:hover{border-color:var(--primary);color:var(--primary)}
+#graph-svg{width:100%;height:380px;border:1px solid var(--border);border-radius:10px;background:#fafafa;display:block}
+#step-log{background:#0f172a;color:#94a3b8;border-radius:8px;padding:.7rem 1rem;font-size:.78rem;font-family:'Courier New',monospace;min-height:72px;max-height:140px;overflow-y:auto}
+.log-fwd{color:#6ee7b7}.log-bwd{color:#fca5a5}.log-info{color:#93c5fd}
+.rtable{width:100%;border-collapse:collapse;font-size:.85rem}
+.rtable th{background:#f1f5f9;padding:.45rem .7rem;text-align:left;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)}
+.rtable td{padding:.45rem .7rem;border-bottom:1px solid #f1f5f9}
+.rtable tr:last-child td{border-bottom:none}
+.badge{display:inline-block;padding:.1rem .45rem;border-radius:999px;font-size:.72rem;font-weight:700}
+.bv{background:#dbeafe;color:#1e40af}.bc{background:#ede9fe;color:#5b21b6}.bo{background:#f1f5f9;color:#374151}
+.mcard{border:1.5px solid var(--border);border-radius:10px;padding:1.1rem}
+.mcard h4{font-size:.9rem;font-weight:700;margin-bottom:.4rem}
+.cost{font-size:1.6rem;font-weight:800;margin:.4rem 0}
+.cost.bad{color:#dc2626}.cost.ok{color:#d97706}.cost.good{color:#059669}
+#trace-wrap{overflow-x:auto;font-size:.82rem}
+.ttable{border-collapse:collapse;min-width:480px}
+.ttable th,.ttable td{padding:.35rem .65rem;border:1px solid var(--border);text-align:center}
+.ttable th{background:#f1f5f9;font-weight:600;color:var(--muted)}
+.tp{color:var(--fwd);font-weight:700}.tt{color:var(--bwd);font-weight:700}
+canvas{border:1px solid var(--border);border-radius:10px;display:block;width:100%}
+.err{color:var(--bwd);font-size:.82rem;padding:.3rem 0;min-height:1.2em}
+.formula{font-family:'Georgia',serif;font-size:1.05rem;background:var(--primary-light);padding:.45rem 1rem;border-radius:8px;text-align:center;color:#3730a3;margin:.6rem 0}
+.slider-row{display:flex;align-items:center;gap:.6rem;font-size:.85rem}
+.slider-val{min-width:3em;font-weight:700;color:var(--primary)}
+.chip{display:inline-flex;gap:.4rem;background:#f1f5f9;border-radius:8px;padding:.25rem}
+.chip button{border:none;background:none;padding:.2rem .7rem;border-radius:6px;cursor:pointer;font-size:.8rem;font-family:inherit;color:var(--muted);font-weight:600;transition:all .15s}
+.chip button.active{background:#fff;color:var(--primary);box-shadow:0 1px 3px rgba(0,0,0,.1)}
+@keyframes glow{0%,100%{opacity:1}50%{opacity:.5}}
+.flashing{animation:glow .4s}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Automatic Differentiation</h1>
+  <p>An interactive exploration of forward &amp; reverse mode AD — and why it powers modern deep learning</p>
+</header>
+
+<div class="tabs">
+  <button class="tab-btn active" data-tab="intro">Why Autodiff?</button>
+  <button class="tab-btn" data-tab="graph">Computational Graph</button>
+  <button class="tab-btn" data-tab="forward">Forward Mode</button>
+  <button class="tab-btn" data-tab="gd">Gradient Descent</button>
+</div>
+
+<main>
+
+<!-- ═══════════════════════════ TAB 1: WHY AUTODIFF ═══════════════════════════ -->
+<section class="tab-pane active" id="tab-intro">
+  <div class="card">
+    <h2>The gradient problem</h2>
+    <p>
+      Training a neural network requires computing the gradient of the loss with respect to
+      <em>every</em> parameter — potentially <strong>billions</strong> of them.
+      Three strategies exist, and they differ wildly in cost.
+    </p>
+    <div class="grid-3">
+      <div class="mcard">
+        <h4>🔢 Numerical Differentiation</h4>
+        <div class="cost bad">O(n) evals</div>
+        <p style="font-size:.82rem;color:var(--muted)">
+          For each parameter θ<sub>i</sub>, perturb it by ε and measure Δf.
+          Needs <em>n</em> extra forward passes. Impractical for large models; also inexact due to floating-point rounding.
+        </p>
+        <div class="formula" style="font-size:.85rem">∂f/∂xᵢ ≈ (f(x+εeᵢ)−f(x)) / ε</div>
+      </div>
+      <div class="mcard">
+        <h4>✏️ Symbolic Differentiation</h4>
+        <div class="cost ok">Expression blow-up</div>
+        <p style="font-size:.82rem;color:var(--muted)">
+          Applies calculus rules to produce an exact symbolic formula.
+          The resulting expression can be exponentially larger than the original — a problem called <em>expression swell</em>.
+        </p>
+        <div class="formula" style="font-size:.85rem">d/dx(x·sin(x)) = sin(x) + x·cos(x)</div>
+      </div>
+      <div class="mcard">
+        <h4>⚡ Automatic Differentiation</h4>
+        <div class="cost good">O(1) overhead</div>
+        <p style="font-size:.82rem;color:var(--muted)">
+          Evaluates derivatives alongside values using the chain rule on a computation graph.
+          <strong>All n gradients</strong> cost only ~2–4× a single forward pass — regardless of n.
+        </p>
+        <div class="formula" style="font-size:.85rem">∂L/∂θᵢ for all i in one backward pass</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <h3>The chain rule — the key idea</h3>
+      <p>
+        Any computation can be broken into primitive operations (+, ×, sin, …).
+        Each primitive has a known local derivative. The <strong>chain rule</strong> lets us compose them:
+      </p>
+      <div class="formula">∂z/∂x = (∂z/∂v)·(∂v/∂x) + (∂z/∂w)·(∂w/∂x)</div>
+      <p>
+        <strong>Forward mode</strong> propagates <em>tangents</em> (∂v/∂x) left-to-right through the graph — best when inputs are few.
+      </p>
+      <p>
+        <strong>Reverse mode</strong> propagates <em>adjoints</em> (∂L/∂v) right-to-left — best when outputs are few (e.g., a scalar loss). This is <em>backpropagation</em>.
+      </p>
+      <div class="note green">In deep learning: one scalar loss, millions of params → reverse mode wins.</div>
+    </div>
+    <div class="card">
+      <h3>Two passes, one graph</h3>
+      <p>The computation graph for <code>f(x,y) = x·y + sin(x)</code>:</p>
+      <svg viewBox="0 0 340 220" style="width:100%;height:180px">
+        <defs>
+          <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="#94a3b8"/>
+          </marker>
+        </defs>
+        <!-- edges -->
+        <line x1="60" y1="180" x2="130" y2="130" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+        <line x1="130" y1="180" x2="145" y2="130" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+        <line x1="60" y1="180" x2="205" y2="130" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+        <line x1="140" y1="110" x2="200" y2="65" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+        <line x1="215" y1="110" x2="210" y2="65" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+        <!-- nodes -->
+        <circle cx="60" cy="188" r="18" fill="#dbeafe" stroke="#1e40af" stroke-width="2"/>
+        <text x="60" y="193" text-anchor="middle" font-size="12" fill="#1e40af" font-weight="bold">x</text>
+        <circle cx="130" cy="188" r="18" fill="#ede9fe" stroke="#5b21b6" stroke-width="2"/>
+        <text x="130" y="193" text-anchor="middle" font-size="12" fill="#5b21b6" font-weight="bold">y</text>
+        <circle cx="140" cy="118" r="20" fill="#f0fdf4" stroke="#059669" stroke-width="2"/>
+        <text x="140" y="123" text-anchor="middle" font-size="13" fill="#059669" font-weight="bold">×</text>
+        <circle cx="215" cy="118" r="20" fill="#f0fdf4" stroke="#059669" stroke-width="2"/>
+        <text x="215" y="123" text-anchor="middle" font-size="11" fill="#059669" font-weight="bold">sin</text>
+        <circle cx="205" cy="50" r="20" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+        <text x="205" y="55" text-anchor="middle" font-size="13" fill="#d97706" font-weight="bold">+</text>
+        <!-- labels -->
+        <text x="60" y="210" text-anchor="middle" font-size="10" fill="#64748b">x=2</text>
+        <text x="130" y="210" text-anchor="middle" font-size="10" fill="#64748b">y=3</text>
+        <text x="140" y="145" text-anchor="middle" font-size="10" fill="#059669">val=6</text>
+        <text x="215" y="145" text-anchor="middle" font-size="10" fill="#059669">val=0.91</text>
+        <text x="230" y="55" text-anchor="start" font-size="10" fill="#d97706">val=6.91</text>
+        <text x="10" y="105" font-size="10" fill="#dc2626">← backward</text>
+        <text x="10" y="165" font-size="10" fill="#059669">forward →</text>
+      </svg>
+      <div class="note">Explore this interactively in the <strong>Computational Graph</strong> tab!</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════ TAB 2: COMP GRAPH ═══════════════════════════ -->
+<section class="tab-pane" id="tab-graph">
+  <div class="card">
+    <div class="card-title">Expression &amp; Variables</div>
+    <div class="card-sub">Supported: +  −  *  /  ^  sin  cos  exp  ln  tanh · Variables: any letter sequence</div>
+    <div class="ctrl">
+      <div>
+        <label>Expression</label>
+        <input type="text" id="expr-input" value="x*x + sin(x)" style="width:240px">
+      </div>
+      <div>
+        <label>Variable values (e.g. x=2,y=3)</label>
+        <input type="text" id="vars-input" value="x=2" style="width:180px">
+      </div>
+      <div style="align-self:flex-end">
+        <button class="btn btn-p" id="build-btn">Build Graph</button>
+      </div>
+    </div>
+    <div class="ctrl" style="gap:.4rem">
+      <span style="font-size:.8rem;color:var(--muted);margin-right:.3rem">Presets:</span>
+      <button class="btn btn-o" style="font-size:.78rem;padding:.3rem .7rem" onclick="setPreset('x*x + sin(x)','x=2')">x²+sin(x)</button>
+      <button class="btn btn-o" style="font-size:.78rem;padding:.3rem .7rem" onclick="setPreset('x*y + exp(x)','x=1,y=2')">xy+eˣ</button>
+      <button class="btn btn-o" style="font-size:.78rem;padding:.3rem .7rem" onclick="setPreset('(x+y)*(x-y)','x=3,y=1')">(x+y)(x−y)</button>
+      <button class="btn btn-o" style="font-size:.78rem;padding:.3rem .7rem" onclick="setPreset('ln(x*x + 1)','x=2')">ln(x²+1)</button>
+      <button class="btn btn-o" style="font-size:.78rem;padding:.3rem .7rem" onclick="setPreset('tanh(x*y - 1)','x=1,y=2')">tanh(xy−1)</button>
+    </div>
+    <div class="err" id="graph-err"></div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;margin-bottom:.8rem">
+      <div class="card-title" style="margin:0;flex:1">Computation Graph</div>
+      <button class="btn btn-g" id="fwd-btn" disabled>▶ Forward Pass</button>
+      <button class="btn btn-r" id="bwd-btn" disabled>▶ Backward Pass</button>
+      <button class="btn btn-o" id="reset-btn" disabled>↺ Reset</button>
+    </div>
+    <svg id="graph-svg"></svg>
+    <div style="margin-top:.75rem">
+      <div style="font-size:.78rem;color:var(--muted);margin-bottom:.3rem">Step log</div>
+      <div id="step-log"><span style="color:#475569">Build a graph to begin.</span></div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card" id="results-card" style="display:none">
+      <div class="card-title">Results</div>
+      <table class="rtable" id="results-table">
+        <thead><tr><th>Node</th><th>Type</th><th>Value (forward)</th><th>Gradient (backward)</th></tr></thead>
+        <tbody id="results-body"></tbody>
+      </table>
+    </div>
+    <div class="card">
+      <div class="card-title">Legend</div>
+      <div style="display:flex;flex-direction:column;gap:.5rem;font-size:.85rem;margin-top:.3rem">
+        <div style="display:flex;align-items:center;gap:.6rem"><span style="width:16px;height:16px;border-radius:50%;background:#dbeafe;border:2px solid #1e40af;display:inline-block"></span> Variable node (input)</div>
+        <div style="display:flex;align-items:center;gap:.6rem"><span style="width:16px;height:16px;border-radius:50%;background:#ede9fe;border:2px solid #5b21b6;display:inline-block"></span> Constant node</div>
+        <div style="display:flex;align-items:center;gap:.6rem"><span style="width:16px;height:16px;border-radius:50%;background:#f1f5f9;border:2px solid #374151;display:inline-block"></span> Operation node</div>
+        <div style="display:flex;align-items:center;gap:.6rem"><span style="width:16px;height:16px;border-radius:4px;background:var(--fwd-light);border:2px solid var(--fwd);display:inline-block"></span> Active during forward pass</div>
+        <div style="display:flex;align-items:center;gap:.6rem"><span style="width:16px;height:16px;border-radius:4px;background:var(--bwd-light);border:2px solid var(--bwd);display:inline-block"></span> Active during backward pass</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════ TAB 3: FORWARD MODE ═══════════════════════════ -->
+<section class="tab-pane" id="tab-forward">
+  <div class="card">
+    <h2>Forward Mode: Dual Numbers</h2>
+    <p>
+      Forward mode AD augments every real number with a <em>tangent</em> component, tracking how the value changes with respect to one chosen input variable.
+      A <strong>dual number</strong> is written as:
+    </p>
+    <div class="formula">x + ε·ẋ &nbsp;&nbsp; where ε² = 0</div>
+    <p>
+      At any leaf node, we set ẋ = 1 for the variable we're differentiating with respect to (the "active variable"), and ẋ = 0 for all others.
+      Each arithmetic operation propagates both the value and its derivative simultaneously — no separate backward pass needed.
+    </p>
+    <div class="note green">
+      Forward mode is most efficient when the number of <em>inputs</em> is small (e.g., computing a full Jacobian column-by-column).
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Interactive Dual Number Trace</div>
+    <div class="card-sub">Enter a single-variable expression. The table shows the dual number computation at every node.</div>
+    <div class="ctrl">
+      <div>
+        <label>f(x) =</label>
+        <input type="text" id="fwd-expr" value="x*x + sin(x)" style="width:210px">
+      </div>
+      <div>
+        <label>x =</label>
+        <input type="number" id="fwd-x" value="2" step="0.1" style="width:80px">
+      </div>
+      <button class="btn btn-p" id="fwd-run-btn" style="align-self:flex-end">Compute</button>
+    </div>
+    <div class="ctrl" style="gap:.4rem">
+      <span style="font-size:.8rem;color:var(--muted)">Presets:</span>
+      <button class="btn btn-o" style="font-size:.78rem;padding:.3rem .7rem" onclick="setFwdPreset('x*x + sin(x)',2)">x²+sin(x)</button>
+      <button class="btn btn-o" style="font-size:.78rem;padding:.3rem .7rem" onclick="setFwdPreset('exp(x)*cos(x)',1)">eˣ·cos(x)</button>
+      <button class="btn btn-o" style="font-size:.78rem;padding:.3rem .7rem" onclick="setFwdPreset('ln(x*x+1)',2)">ln(x²+1)</button>
+      <button class="btn btn-o" style="font-size:.78rem;padding:.3rem .7rem" onclick="setFwdPreset('tanh(x)',0)">tanh(x)</button>
+    </div>
+    <div class="err" id="fwd-err"></div>
+    <div id="trace-wrap" style="display:none">
+      <div style="display:flex;gap:1.5rem;margin-bottom:.75rem;flex-wrap:wrap">
+        <div style="font-size:.9rem"><span style="font-weight:700">f(x)</span> = <span id="fwd-val" style="color:var(--fwd);font-weight:700"></span></div>
+        <div style="font-size:.9rem"><span style="font-weight:700">f′(x)</span> = <span id="fwd-deriv" style="color:var(--bwd);font-weight:700"></span></div>
+        <div style="font-size:.9rem;color:var(--muted)">Numerical check: <span id="fwd-check"></span></div>
+      </div>
+      <div id="trace-wrap-inner"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Dual arithmetic rules</h3>
+    <div class="grid-2">
+      <div>
+        <div class="formula" style="font-size:.9rem">(a + aε) + (b + bε) = (a+b) + (a+b)ε</div>
+        <div class="formula" style="font-size:.9rem">(a + aε) · (b + bε) = ab + (ab+ab)ε</div>
+        <div class="formula" style="font-size:.9rem">sin(a + aε) = sin(a) + a·cos(a)·ε</div>
+        <div class="formula" style="font-size:.9rem">exp(a + aε) = eᵃ + a·eᵃ·ε</div>
+      </div>
+      <div style="font-size:.85rem;color:var(--muted)">
+        <p>The tangent component (coefficient of ε) exactly tracks the derivative — no approximation, no extra function evaluations.</p>
+        <p>Since ε² = 0, all higher-order terms vanish automatically. This makes dual numbers both exact and cheap.</p>
+        <div class="note" style="font-size:.82rem">Each rule is just the chain rule applied to one primitive operation.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════ TAB 4: GRADIENT DESCENT ═══════════════════════════ -->
+<section class="tab-pane" id="tab-gd">
+  <div class="card">
+    <h2>Gradient Descent in Action</h2>
+    <p>
+      Once we can compute gradients cheaply via autodiff, we can minimize a loss function by repeatedly stepping in the direction of steepest descent.
+      Here we train a linear model <strong>y = wx + b</strong> on synthetic data using the Mean Squared Error loss:
+    </p>
+    <div class="formula">L(w,b) = (1/n) Σ (w·xᵢ + b − yᵢ)²</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Controls</div>
+    <div class="ctrl">
+      <div>
+        <label>Dataset</label>
+        <select id="dataset-sel">
+          <option value="line">y = 2x + 1 (linear)</option>
+          <option value="noisy">y = 2x + 1 + noise</option>
+          <option value="steep">y = −3x + 5</option>
+        </select>
+      </div>
+      <div>
+        <label>Optimizer</label>
+        <div class="chip" id="opt-chip">
+          <button class="active" data-opt="sgd">SGD</button>
+          <button data-opt="momentum">Momentum</button>
+          <button data-opt="adam">Adam</button>
+        </div>
+      </div>
+    </div>
+    <div class="ctrl">
+      <div class="slider-row">
+        <label style="margin:0">Learning rate</label>
+        <input type="range" id="lr-slider" min="-3" max="0" step="0.05" value="-1.3">
+        <span class="slider-val" id="lr-val">0.05</span>
+      </div>
+    </div>
+    <div class="ctrl" style="gap:.5rem">
+      <button class="btn btn-p" id="gd-start">▶ Start Training</button>
+      <button class="btn btn-o" id="gd-step" disabled>Step ×1</button>
+      <button class="btn btn-o" id="gd-step10" disabled>Step ×10</button>
+      <button class="btn btn-o" id="gd-reset">↺ Reset</button>
+    </div>
+    <div style="font-size:.85rem;color:var(--muted)">
+      Epoch: <strong id="gd-epoch">0</strong> &nbsp;|&nbsp;
+      Loss: <strong id="gd-loss">—</strong> &nbsp;|&nbsp;
+      w: <strong id="gd-w">—</strong> &nbsp;|&nbsp;
+      b: <strong id="gd-b">—</strong>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card" style="padding:1rem">
+      <div class="card-title" style="margin-bottom:.6rem">Data &amp; fitted line</div>
+      <canvas id="scatter-canvas" height="280"></canvas>
+    </div>
+    <div class="card" style="padding:1rem">
+      <div class="card-title" style="margin-bottom:.6rem">Loss curve</div>
+      <canvas id="loss-canvas" height="280"></canvas>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Why does the learning rate matter so much?</h3>
+    <div class="grid-3">
+      <div>
+        <div style="font-size:.85rem;font-weight:700;color:var(--bwd);margin-bottom:.3rem">Too large (η ≫ optimal)</div>
+        <p style="font-size:.82rem;color:var(--muted)">Overshoots the minimum on each step — loss may oscillate or diverge entirely.</p>
+      </div>
+      <div>
+        <div style="font-size:.85rem;font-weight:700;color:var(--fwd);margin-bottom:.3rem">Just right (η ≈ optimal)</div>
+        <p style="font-size:.82rem;color:var(--muted)">Converges smoothly and quickly to the minimum.</p>
+      </div>
+      <div>
+        <div style="font-size:.85rem;font-weight:700;color:var(--muted);margin-bottom:.3rem">Too small (η ≪ optimal)</div>
+        <p style="font-size:.82rem;color:var(--muted)">Converges, but takes many more iterations — impractical for large models.</p>
+      </div>
+    </div>
+    <div class="note" style="margin-top:.75rem">
+      <strong>Adam</strong> adapts the learning rate per-parameter using estimates of the first and second moments of the gradients — making it much more robust to the choice of η.
+    </div>
+  </div>
+</section>
+
+</main>
+
+<script>
+// ═══════════════════════════ TABS ═══════════════════════════
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    if (btn.dataset.tab === 'gd') initGD();
+  });
+});
+
+// ═══════════════════════════ PARSER ═══════════════════════════
+function tokenize(s) {
+  const toks = []; let i = 0;
+  while (i < s.length) {
+    if (/\s/.test(s[i])) { i++; continue; }
+    if (/[0-9.]/.test(s[i])) {
+      let n = ''; while (i < s.length && /[0-9.]/.test(s[i])) n += s[i++];
+      toks.push({t:'num', v:parseFloat(n)});
+    } else if (/[a-zA-Z]/.test(s[i])) {
+      let w = ''; while (i < s.length && /[a-zA-Z0-9_]/.test(s[i])) w += s[i++];
+      const fs = ['sin','cos','exp','ln','tanh'];
+      toks.push({t: fs.includes(w) ? 'fn' : 'var', v: w});
+    } else { toks.push({t:'op', v:s[i++]}); }
+  }
+  return toks;
+}
+
+function parse(input) {
+  const toks = tokenize(input); let pos = 0;
+  const peek = () => toks[pos];
+  const eat = () => toks[pos++];
+  function expr() {
+    let n = term();
+    while (peek() && (peek().v==='+' || peek().v==='-')) {
+      const op = eat().v; const r = term();
+      n = {t: op==='+'?'add':'sub', c:[n,r]};
+    }
+    return n;
+  }
+  function term() {
+    let n = pow();
+    while (peek() && (peek().v==='*' || peek().v==='/')) {
+      const op = eat().v; const r = pow();
+      n = {t: op==='*'?'mul':'div', c:[n,r]};
+    }
+    return n;
+  }
+  function pow() {
+    let n = unary();
+    if (peek() && peek().v==='^') { eat(); n = {t:'pow', c:[n, unary()]}; }
+    return n;
+  }
+  function unary() {
+    if (peek() && peek().v==='-') { eat(); return {t:'neg', c:[base()]}; }
+    return base();
+  }
+  function base() {
+    const tok = peek();
+    if (!tok) throw new Error('Unexpected end');
+    if (tok.t==='num') { eat(); return {t:'const', v:tok.v}; }
+    if (tok.t==='var') { eat(); return {t:'var', name:tok.v}; }
+    if (tok.t==='fn') {
+      eat();
+      if (!peek() || peek().v!=='(') throw new Error('Expected ( after '+tok.v);
+      eat();
+      const arg = expr();
+      if (!peek() || peek().v!==')') throw new Error('Expected )');
+      eat();
+      return {t:tok.v, c:[arg]};
+    }
+    if (tok.v==='(') { eat(); const n=expr(); if(!peek()||peek().v!==')') throw new Error('Expected )'); eat(); return n; }
+    throw new Error('Unexpected: '+tok.v);
+  }
+  const result = expr();
+  if (pos < toks.length) throw new Error('Unexpected token: '+toks[pos].v);
+  return result;
+}
+
+// ═══════════════════════════ COMPUTATION GRAPH ═══════════════════════════
+class Graph {
+  constructor() { this.nodes=[]; this.varMap={}; }
+  add(type, label, children=[]) {
+    const id=this.nodes.length;
+    this.nodes.push({id,type,label,children,value:null,grad:0,x:0,y:0,done:false});
+    return id;
+  }
+  fromAST(ast) {
+    this.nodes=[]; this.varMap={};
+    const root = this._build(ast);
+    this._layout(480, 360);
+    return root;
+  }
+  _build(ast) {
+    if (ast.t==='const') return this.add('const', fmt(ast.v), []);
+    if (ast.t==='var') {
+      if (ast.name in this.varMap) return this.varMap[ast.name];
+      const id=this.add('var', ast.name, []);
+      this.varMap[ast.name]=id; return id;
+    }
+    const opL = {add:'+',sub:'−',mul:'×',div:'÷',neg:'−',pow:'^',exp:'exp',ln:'ln',sin:'sin',cos:'cos',tanh:'tanh'};
+    const ch = ast.c.map(c=>this._build(c));
+    return this.add(ast.t, opL[ast.t]||ast.t, ch);
+  }
+  topo() {
+    const vis=new Set(), ord=[];
+    const dfs=id=>{if(vis.has(id))return;vis.add(id);for(const c of this.nodes[id].children)dfs(c);ord.push(id);};
+    for(const n of this.nodes) dfs(n.id);
+    return ord;
+  }
+  forward(env) {
+    const ord=this.topo();
+    for(const id of ord){
+      const n=this.nodes[id];
+      if(n.type==='const'){n.value=parseFloat(n.label);}
+      else if(n.type==='var'){
+        if(!(n.label in env))throw new Error('Unknown variable: '+n.label);
+        n.value=env[n.label];
+      } else {
+        const cv=n.children.map(c=>this.nodes[c].value);
+        n.value=this._eval(n.type,cv);
+      }
+    }
+    return ord;
+  }
+  _eval(type,v) {
+    switch(type){
+      case 'add':return v[0]+v[1];case 'sub':return v[0]-v[1];
+      case 'mul':return v[0]*v[1];case 'div':return v[0]/v[1];
+      case 'neg':return -v[0];case 'pow':return Math.pow(v[0],v[1]);
+      case 'exp':return Math.exp(v[0]);case 'ln':return Math.log(v[0]);
+      case 'sin':return Math.sin(v[0]);case 'cos':return Math.cos(v[0]);
+      case 'tanh':return Math.tanh(v[0]);
+    }
+  }
+  backward(root) {
+    for(const n of this.nodes) n.grad=0;
+    this.nodes[root].grad=1;
+    const ord=this.topo().reverse();
+    for(const id of ord){
+      const n=this.nodes[id];
+      if(!n.children.length) continue;
+      const lg=this._localGrad(n);
+      for(let i=0;i<n.children.length;i++)
+        this.nodes[n.children[i]].grad += n.grad * lg[i];
+    }
+    return ord.filter(id=>this.nodes[id].children.length>0);
+  }
+  _localGrad(n) {
+    const v=n.children.map(c=>this.nodes[c].value);
+    switch(n.type){
+      case 'add':return[1,1];case 'sub':return[1,-1];
+      case 'mul':return[v[1],v[0]];
+      case 'div':return[1/v[1],-v[0]/(v[1]*v[1])];
+      case 'neg':return[-1];case 'pow':return[v[1]*Math.pow(v[0],v[1]-1),Math.pow(v[0],v[1])*Math.log(Math.abs(v[0]))];
+      case 'exp':return[n.value];case 'ln':return[1/v[0]];
+      case 'sin':return[Math.cos(v[0])];case 'cos':return[-Math.sin(v[0])];
+      case 'tanh':return[1-n.value*n.value];
+      default:return n.children.map(()=>0);
+    }
+  }
+  _layout(W,H) {
+    const ord=this.topo();
+    const layers=new Array(this.nodes.length).fill(0);
+    for(const id of ord){
+      const n=this.nodes[id];
+      if(n.children.length) layers[id]=Math.max(...n.children.map(c=>layers[c]))+1;
+    }
+    const maxL=Math.max(...layers);
+    const byLayer={};
+    for(let id=0;id<this.nodes.length;id++){
+      const l=layers[id];
+      if(!byLayer[l])byLayer[l]=[];
+      byLayer[l].push(id);
+    }
+    const pad=50, uw=W-2*pad, uh=H-2*pad;
+    for(const[l,ids] of Object.entries(byLayer)){
+      const y=pad+(maxL-parseInt(l))/(maxL||1)*uh;
+      ids.forEach((id,i)=>{
+        this.nodes[id].x=pad+(i+.5)/ids.length*uw;
+        this.nodes[id].y=y;
+      });
+    }
+  }
+}
+
+// ═══════════════════════════ SVG RENDERER ═══════════════════════════
+const R=22;
+let graph=null, rootId=null, animTimer=null;
+
+function renderGraph(g, highlightFwd=new Set(), highlightBwd=new Set()) {
+  const svg=document.getElementById('graph-svg');
+  const W=svg.clientWidth||620, H=380;
+  svg.innerHTML='';
+  svg.setAttribute('viewBox',`0 0 ${W} ${H}`);
+
+  // Re-layout with actual width
+  g._layout(W, H);
+
+  const ns='http://www.w3.org/2000/svg';
+  const defs=document.createElementNS(ns,'defs');
+  const mk=document.createElementNS(ns,'marker');
+  mk.setAttribute('id','arrowG'); mk.setAttribute('markerWidth','8'); mk.setAttribute('markerHeight','8');
+  mk.setAttribute('refX','7'); mk.setAttribute('refY','3'); mk.setAttribute('orient','auto');
+  const mkp=document.createElementNS(ns,'path'); mkp.setAttribute('d','M0,0 L0,6 L8,3 z'); mkp.setAttribute('fill','#94a3b8');
+  mk.appendChild(mkp); defs.appendChild(mk); svg.appendChild(defs);
+
+  // edges
+  for(const n of g.nodes) {
+    for(const cid of n.children) {
+      const c=g.nodes[cid];
+      const dx=n.x-c.x, dy=n.y-c.y, dist=Math.sqrt(dx*dx+dy*dy);
+      const ux=dx/dist, uy=dy/dist;
+      const x1=c.x+ux*R, y1=c.y+uy*R, x2=n.x-ux*(R+2), y2=n.y-uy*(R+2);
+      const line=document.createElementNS(ns,'line');
+      line.setAttribute('x1',x1);line.setAttribute('y1',y1);
+      line.setAttribute('x2',x2);line.setAttribute('y2',y2);
+      line.setAttribute('stroke',highlightBwd.has(n.id)?'#fca5a5':highlightFwd.has(n.id)?'#6ee7b7':'#cbd5e1');
+      line.setAttribute('stroke-width',highlightFwd.has(n.id)||highlightBwd.has(n.id)?'2.5':'1.5');
+      line.setAttribute('marker-end','url(#arrowG)');
+      svg.appendChild(line);
+    }
+  }
+
+  // nodes
+  for(const n of g.nodes) {
+    const g2=document.createElementNS(ns,'g');
+    g2.setAttribute('id','node-'+n.id);
+
+    const fill = n.type==='var'?'#dbeafe': n.type==='const'?'#ede9fe':'#f8fafc';
+    const stroke = n.type==='var'?'#1e40af': n.type==='const'?'#5b21b6':'#475569';
+    const actualFill = highlightFwd.has(n.id)?'#ecfdf5': highlightBwd.has(n.id)?'#fef2f2': fill;
+    const actualStroke = highlightFwd.has(n.id)?'#059669': highlightBwd.has(n.id)?'#dc2626': stroke;
+    const sw = (highlightFwd.has(n.id)||highlightBwd.has(n.id))?3:2;
+
+    const circ=document.createElementNS(ns,'circle');
+    circ.setAttribute('cx',n.x);circ.setAttribute('cy',n.y);circ.setAttribute('r',R);
+    circ.setAttribute('fill',actualFill);circ.setAttribute('stroke',actualStroke);circ.setAttribute('stroke-width',sw);
+    g2.appendChild(circ);
+
+    const lbl=document.createElementNS(ns,'text');
+    lbl.setAttribute('x',n.x);lbl.setAttribute('y',n.y+1);
+    lbl.setAttribute('text-anchor','middle');lbl.setAttribute('dominant-baseline','middle');
+    lbl.setAttribute('font-size','13');lbl.setAttribute('font-weight','700');
+    lbl.setAttribute('fill',actualStroke);
+    lbl.textContent=n.label;
+    g2.appendChild(lbl);
+
+    if(n.value!==null) {
+      const vt=document.createElementNS(ns,'text');
+      vt.setAttribute('x',n.x);vt.setAttribute('y',n.y+R+12);
+      vt.setAttribute('text-anchor','middle');vt.setAttribute('font-size','10');
+      vt.setAttribute('fill','#059669');vt.setAttribute('font-weight','600');
+      vt.textContent=fmt(n.value);
+      g2.appendChild(vt);
+    }
+    if(n.grad!==0) {
+      const gt2=document.createElementNS(ns,'text');
+      gt2.setAttribute('x',n.x);gt2.setAttribute('y',n.y-R-4);
+      gt2.setAttribute('text-anchor','middle');gt2.setAttribute('font-size','10');
+      gt2.setAttribute('fill','#dc2626');gt2.setAttribute('font-weight','600');
+      gt2.textContent='∂='+fmt(n.grad);
+      g2.appendChild(gt2);
+    }
+
+    svg.appendChild(g2);
+  }
+}
+
+function fmt(v) {
+  if(v===null||v===undefined) return '?';
+  if(Math.abs(v)<1e-10) return '0';
+  if(Number.isInteger(v)) return String(v);
+  return v.toFixed(4).replace(/\.?0+$/,'');
+}
+
+function parseEnv(s) {
+  const env={};
+  s.split(',').forEach(part=>{
+    const [k,v]=part.trim().split('=');
+    if(k&&v!==undefined) env[k.trim()]=parseFloat(v.trim());
+  });
+  return env;
+}
+
+function logEntry(msg, cls='') {
+  const log=document.getElementById('step-log');
+  const div=document.createElement('div');
+  div.className='log-entry '+cls;
+  div.textContent=msg;
+  log.appendChild(div);
+  log.scrollTop=log.scrollHeight;
+}
+
+// Build button
+document.getElementById('build-btn').addEventListener('click', buildGraph);
+
+function buildGraph() {
+  const exprStr=document.getElementById('expr-input').value.trim();
+  const varsStr=document.getElementById('vars-input').value.trim();
+  const errEl=document.getElementById('graph-err');
+  errEl.textContent='';
+  clearAnimTimer();
+
+  try {
+    const ast=parse(exprStr);
+    const env=parseEnv(varsStr);
+    graph=new Graph();
+    rootId=graph.fromAST(ast);
+    renderGraph(graph);
+    document.getElementById('step-log').innerHTML='';
+    logEntry('Graph built. Variables: '+Object.entries(env).map(([k,v])=>k+'='+v).join(', '),'log-info');
+    document.getElementById('fwd-btn').disabled=false;
+    document.getElementById('bwd-btn').disabled=true;
+    document.getElementById('reset-btn').disabled=false;
+    document.getElementById('results-card').style.display='none';
+    // store env for later
+    graph._env=env;
+  } catch(e) {
+    errEl.textContent='Error: '+e.message;
+    graph=null;
+  }
+}
+
+// Forward pass animation
+document.getElementById('fwd-btn').addEventListener('click', () => {
+  if(!graph) return;
+  clearAnimTimer();
+  let ord;
+  try { ord=graph.forward(graph._env); } catch(e) { logEntry('Error: '+e.message,'log-info'); return; }
+  document.getElementById('fwd-btn').disabled=true;
+  document.getElementById('bwd-btn').disabled=true;
+  logEntry('── Forward pass ──────────────','log-info');
+  let i=0;
+  animTimer=setInterval(()=>{
+    if(i>=ord.length){
+      clearAnimTimer();
+      document.getElementById('bwd-btn').disabled=false;
+      logEntry('Forward pass complete. Output = '+fmt(graph.nodes[rootId].value),'log-info');
+      renderGraph(graph);
+      return;
+    }
+    const id=ord[i];
+    const n=graph.nodes[id];
+    renderGraph(graph, new Set([id]));
+    const childStr=n.children.map(c=>`${graph.nodes[c].label}=${fmt(graph.nodes[c].value)}`).join(', ');
+    logEntry(`Node [${n.label}]: ${childStr?childStr+' → ':''}value = ${fmt(n.value)}`,'log-fwd');
+    i++;
+  }, 600);
+});
+
+// Backward pass animation
+document.getElementById('bwd-btn').addEventListener('click', () => {
+  if(!graph) return;
+  clearAnimTimer();
+  const ord=graph.backward(rootId);
+  document.getElementById('bwd-btn').disabled=true;
+  logEntry('── Backward pass ─────────────','log-info');
+  let i=0;
+  animTimer=setInterval(()=>{
+    if(i>=ord.length){
+      clearAnimTimer();
+      logEntry('Backward pass complete.','log-info');
+      renderGraph(graph);
+      updateResultsTable();
+      return;
+    }
+    const id=ord[i];
+    const n=graph.nodes[id];
+    renderGraph(graph, new Set(), new Set([id]));
+    const lg=graph._localGrad(n);
+    n.children.forEach((cid,ci)=>{
+      logEntry(`  ∂/∂[${graph.nodes[cid].label}] via [${n.label}]: grad += ${fmt(n.grad)} × ${fmt(lg[ci])} = ${fmt(n.grad*lg[ci])}`,'log-bwd');
+    });
+    i++;
+  }, 700);
+});
+
+document.getElementById('reset-btn').addEventListener('click', () => {
+  if(!graph) return;
+  clearAnimTimer();
+  for(const n of graph.nodes){n.value=null;n.grad=0;}
+  renderGraph(graph);
+  document.getElementById('step-log').innerHTML='';
+  logEntry('Reset. Click Forward Pass to start.','log-info');
+  document.getElementById('fwd-btn').disabled=false;
+  document.getElementById('bwd-btn').disabled=true;
+  document.getElementById('results-card').style.display='none';
+});
+
+function clearAnimTimer() { if(animTimer){clearInterval(animTimer);animTimer=null;} }
+
+function updateResultsTable() {
+  const body=document.getElementById('results-body');
+  body.innerHTML='';
+  for(const n of graph.nodes){
+    const tr=document.createElement('tr');
+    const typeClass=n.type==='var'?'bv':n.type==='const'?'bc':'bo';
+    const typeName=n.type==='var'?'variable':n.type==='const'?'constant':'operation';
+    tr.innerHTML=`<td><strong>${n.label}</strong></td><td><span class="badge ${typeClass}">${typeName}</span></td><td style="color:var(--fwd);font-weight:600">${fmt(n.value)}</td><td style="color:var(--bwd);font-weight:600">${fmt(n.grad)}</td>`;
+    body.appendChild(tr);
+  }
+  document.getElementById('results-card').style.display='block';
+}
+
+function setPreset(expr, vars) {
+  document.getElementById('expr-input').value=expr;
+  document.getElementById('vars-input').value=vars;
+  buildGraph();
+}
+
+// ═══════════════════════════ FORWARD MODE ═══════════════════════════
+function dualOp(type, a, b) {
+  switch(type){
+    case 'add':return{p:a.p+b.p, t:a.t+b.t};
+    case 'sub':return{p:a.p-b.p, t:a.t-b.t};
+    case 'mul':return{p:a.p*b.p, t:a.p*b.t+a.t*b.p};
+    case 'div':return{p:a.p/b.p, t:(a.t*b.p-a.p*b.t)/(b.p*b.p)};
+    case 'neg':return{p:-a.p, t:-a.t};
+    case 'pow':return{p:Math.pow(a.p,b.p), t:b.p*Math.pow(a.p,b.p-1)*a.t};
+    case 'exp':return{p:Math.exp(a.p), t:a.t*Math.exp(a.p)};
+    case 'ln': return{p:Math.log(a.p), t:a.t/a.p};
+    case 'sin':return{p:Math.sin(a.p), t:a.t*Math.cos(a.p)};
+    case 'cos':return{p:Math.cos(a.p), t:-a.t*Math.sin(a.p)};
+    case 'tanh':const th=Math.tanh(a.p);return{p:th, t:a.t*(1-th*th)};
+    default:return{p:0,t:0};
+  }
+}
+
+function forwardTrace(ast, x, steps=[]) {
+  if(ast.t==='const') { const d={p:ast.v,t:0}; steps.push({label:fmt(ast.v),op:'const',result:d}); return d; }
+  if(ast.t==='var') { const d={p:x,t:1}; steps.push({label:ast.name,op:'var',result:d}); return d; }
+  const opL={add:'+',sub:'−',mul:'×',div:'÷',neg:'neg',pow:'^',exp:'exp',ln:'ln',sin:'sin',cos:'cos',tanh:'tanh'};
+  const childDuals=ast.c.map(c=>forwardTrace(c,x,steps));
+  const result=dualOp(ast.t, childDuals[0], childDuals[1]||{p:0,t:0});
+  steps.push({label:opL[ast.t]||ast.t, op:ast.t, args:childDuals, result});
+  return result;
+}
+
+document.getElementById('fwd-run-btn').addEventListener('click', runForward);
+
+function runForward() {
+  const exprStr=document.getElementById('fwd-expr').value.trim();
+  const x=parseFloat(document.getElementById('fwd-x').value);
+  const errEl=document.getElementById('fwd-err');
+  errEl.textContent='';
+  try {
+    const ast=parse(exprStr);
+    // Check single variable
+    const steps=[];
+    const result=forwardTrace(ast, x, steps);
+    // Deduplicate steps (variable and const nodes may appear multiple times for shared)
+    const seen=new Set();
+    const uniqSteps=steps.filter(s=>{ const k=s.label+s.op+JSON.stringify(s.result); if(seen.has(k))return false; seen.add(k); return true; });
+
+    document.getElementById('fwd-val').textContent=fmt(result.p);
+    document.getElementById('fwd-deriv').textContent=fmt(result.t);
+    const h=1e-5;
+    const numDeriv=(evalAST(ast,x+h)-evalAST(ast,x-h))/(2*h);
+    document.getElementById('fwd-check').textContent=fmt(numDeriv)+' (matches: '+(Math.abs(result.t-numDeriv)<1e-6?'✓':'✗')+')';
+
+    let html='<table class="ttable"><thead><tr><th>Step</th><th>Operation</th><th class="tp">Primal (value)</th><th class="tt">Tangent (derivative)</th></tr></thead><tbody>';
+    uniqSteps.forEach((s,i)=>{
+      html+=`<tr><td>${i+1}</td><td><code>${s.label}</code></td><td class="tp">${fmt(s.result.p)}</td><td class="tt">${fmt(s.result.t)}</td></tr>`;
+    });
+    html+='</tbody></table>';
+    document.getElementById('trace-wrap-inner').innerHTML=html;
+    document.getElementById('trace-wrap').style.display='block';
+  } catch(e) {
+    errEl.textContent='Error: '+e.message;
+    document.getElementById('trace-wrap').style.display='none';
+  }
+}
+
+function evalAST(ast, x) {
+  if(ast.t==='const') return ast.v;
+  if(ast.t==='var') return x;
+  const ch=ast.c.map(c=>evalAST(c,x));
+  switch(ast.t){
+    case 'add':return ch[0]+ch[1];case 'sub':return ch[0]-ch[1];
+    case 'mul':return ch[0]*ch[1];case 'div':return ch[0]/ch[1];
+    case 'neg':return -ch[0];case 'pow':return Math.pow(ch[0],ch[1]);
+    case 'exp':return Math.exp(ch[0]);case 'ln':return Math.log(ch[0]);
+    case 'sin':return Math.sin(ch[0]);case 'cos':return Math.cos(ch[0]);
+    case 'tanh':return Math.tanh(ch[0]);
+  }
+}
+
+function setFwdPreset(expr, x) {
+  document.getElementById('fwd-expr').value=expr;
+  document.getElementById('fwd-x').value=x;
+  runForward();
+}
+
+// ═══════════════════════════ GRADIENT DESCENT ═══════════════════════════
+let gdState=null, gdTimer=null, gdInited=false;
+
+function getDataset(name) {
+  const rng=(s)=>{ let x=Math.sin(s)*1e4; return x-Math.floor(x); };
+  const pts=[];
+  for(let i=0;i<20;i++){
+    const x=(i/9.5)-1;
+    let y;
+    if(name==='line') y=2*x+1;
+    else if(name==='noisy') y=2*x+1+(rng(i*7+1)*2-1)*0.4;
+    else y=-3*x+5+(rng(i*13+3)*2-1)*0.1;
+    pts.push({x,y});
+  }
+  return pts;
+}
+
+function mseLoss(w,b,data){ let s=0; for(const d of data){const r=w*d.x+b-d.y;s+=r*r;} return s/data.length; }
+function mseGrad(w,b,data){ let gw=0,gb=0; for(const d of data){const r=w*d.x+b-d.y;gw+=2*r*d.x;gb+=2*r;} return{gw:gw/data.length,gb:gb/data.length}; }
+
+function initGDState() {
+  const dataset=getDataset(document.getElementById('dataset-sel').value);
+  gdState={
+    w:0, b:0, epoch:0, lossHistory:[], data:dataset,
+    m_w:0, m_b:0, v_w:0, v_b:0 // Adam moments
+  };
+}
+
+function gdStep() {
+  if(!gdState) return;
+  const lr=Math.pow(10, parseFloat(document.getElementById('lr-slider').value));
+  const opt=document.querySelector('#opt-chip button.active').dataset.opt;
+  const {gw,gb}=mseGrad(gdState.w,gdState.b,gdState.data);
+  const t=gdState.epoch+1;
+
+  if(opt==='sgd') {
+    gdState.w -= lr*gw; gdState.b -= lr*gb;
+  } else if(opt==='momentum') {
+    gdState.m_w=0.9*gdState.m_w+gw; gdState.m_b=0.9*gdState.m_b+gb;
+    gdState.w -= lr*gdState.m_w; gdState.b -= lr*gdState.m_b;
+  } else { // Adam
+    const b1=0.9,b2=0.999,eps=1e-8;
+    gdState.m_w=b1*gdState.m_w+(1-b1)*gw; gdState.m_b=b1*gdState.m_b+(1-b1)*gb;
+    gdState.v_w=b2*gdState.v_w+(1-b2)*gw*gw; gdState.v_b=b2*gdState.v_b+(1-b2)*gb*gb;
+    const mw_hat=gdState.m_w/(1-Math.pow(b1,t)); const mb_hat=gdState.m_b/(1-Math.pow(b1,t));
+    const vw_hat=gdState.v_w/(1-Math.pow(b2,t)); const vb_hat=gdState.v_b/(1-Math.pow(b2,t));
+    gdState.w -= lr*mw_hat/(Math.sqrt(vw_hat)+eps);
+    gdState.b -= lr*mb_hat/(Math.sqrt(vb_hat)+eps);
+  }
+  gdState.epoch=t;
+  gdState.lossHistory.push(mseLoss(gdState.w,gdState.b,gdState.data));
+  updateGDDisplay();
+}
+
+function updateGDDisplay() {
+  if(!gdState) return;
+  const loss=gdState.lossHistory[gdState.lossHistory.length-1]??0;
+  document.getElementById('gd-epoch').textContent=gdState.epoch;
+  document.getElementById('gd-loss').textContent=loss.toFixed(5);
+  document.getElementById('gd-w').textContent=gdState.w.toFixed(4);
+  document.getElementById('gd-b').textContent=gdState.b.toFixed(4);
+  drawScatter(); drawLoss();
+}
+
+function drawScatter() {
+  const canvas=document.getElementById('scatter-canvas');
+  const ctx=canvas.getContext('2d');
+  const W=canvas.width, H=canvas.height;
+  ctx.clearRect(0,0,W,H);
+
+  const data=gdState.data;
+  const xs=data.map(d=>d.x), ys=data.map(d=>d.y);
+  const minX=Math.min(...xs)-.3, maxX=Math.max(...xs)+.3;
+  const minY=Math.min(...ys)-.5, maxY=Math.max(...ys)+.5;
+  const px=(x)=>(x-minX)/(maxX-minX)*(W-60)+30;
+  const py=(y)=>H-30-(y-minY)/(maxY-minY)*(H-60);
+
+  // Grid
+  ctx.strokeStyle='#e2e8f0'; ctx.lineWidth=1;
+  for(let i=0;i<=4;i++){
+    const y=30+i*(H-60)/4;
+    ctx.beginPath();ctx.moveTo(30,y);ctx.lineTo(W-20,y);ctx.stroke();
+  }
+
+  // Fitted line
+  ctx.strokeStyle='#6366f1'; ctx.lineWidth=2.5; ctx.setLineDash([]);
+  ctx.beginPath();
+  const y1=gdState.w*minX+gdState.b, y2=gdState.w*maxX+gdState.b;
+  ctx.moveTo(px(minX),py(y1)); ctx.lineTo(px(maxX),py(y2));
+  ctx.stroke();
+
+  // Data points
+  for(const d of data) {
+    ctx.beginPath(); ctx.arc(px(d.x),py(d.y),5,0,2*Math.PI);
+    ctx.fillStyle='#2563eb'; ctx.fill();
+    ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.stroke();
+  }
+
+  // Axes labels
+  ctx.fillStyle='#64748b'; ctx.font='11px system-ui'; ctx.textAlign='center';
+  ctx.fillText('x', W/2, H-2);
+  ctx.save(); ctx.translate(12, H/2); ctx.rotate(-Math.PI/2);
+  ctx.fillText('y', 0, 0); ctx.restore();
+}
+
+function drawLoss() {
+  const canvas=document.getElementById('loss-canvas');
+  const ctx=canvas.getContext('2d');
+  const W=canvas.width, H=canvas.height;
+  ctx.clearRect(0,0,W,H);
+
+  const hist=gdState.lossHistory;
+  if(hist.length<2){
+    ctx.fillStyle='#94a3b8'; ctx.font='13px system-ui'; ctx.textAlign='center';
+    ctx.fillText('Loss history will appear here', W/2, H/2);
+    return;
+  }
+
+  const maxL=Math.max(...hist), minL=0;
+  const px=(i)=>30+(i/(hist.length-1))*(W-50);
+  const py=(v)=>H-30-(v-minL)/(maxL-minL+1e-10)*(H-60);
+
+  // Grid
+  ctx.strokeStyle='#e2e8f0'; ctx.lineWidth=1;
+  for(let i=0;i<=4;i++){const y=30+i*(H-60)/4;ctx.beginPath();ctx.moveTo(30,y);ctx.lineTo(W-15,y);ctx.stroke();}
+
+  // Loss curve
+  ctx.beginPath(); ctx.strokeStyle='#6366f1'; ctx.lineWidth=2.5; ctx.setLineDash([]);
+  hist.forEach((v,i)=>i===0?ctx.moveTo(px(i),py(v)):ctx.lineTo(px(i),py(v)));
+  ctx.stroke();
+
+  // Current point
+  const li=hist.length-1;
+  ctx.beginPath(); ctx.arc(px(li),py(hist[li]),5,0,2*Math.PI);
+  ctx.fillStyle='#dc2626'; ctx.fill();
+
+  // Labels
+  ctx.fillStyle='#64748b'; ctx.font='10px system-ui'; ctx.textAlign='right';
+  ctx.fillText(maxL.toFixed(3),28,35);
+  ctx.fillText((maxL/2).toFixed(3),28,H/2);
+  ctx.fillText('0',28,H-25);
+  ctx.textAlign='center';
+  ctx.fillText('Epoch '+gdState.epoch, W/2, H-2);
+}
+
+function initGD() {
+  if(gdInited) return; gdInited=true;
+  // Canvas sizing
+  ['scatter-canvas','loss-canvas'].forEach(id=>{
+    const c=document.getElementById(id);
+    c.width=c.offsetWidth||400; c.height=280;
+  });
+  initGDState(); updateGDDisplay();
+}
+
+document.getElementById('lr-slider').addEventListener('input', function(){
+  const v=Math.pow(10,parseFloat(this.value));
+  document.getElementById('lr-val').textContent=v.toFixed(4).replace(/\.?0+$/,'');
+});
+
+document.getElementById('gd-start').addEventListener('click', () => {
+  if(gdTimer){ clearInterval(gdTimer); gdTimer=null; document.getElementById('gd-start').textContent='▶ Start Training'; document.getElementById('gd-step').disabled=false; document.getElementById('gd-step10').disabled=false; return; }
+  initGD();
+  document.getElementById('gd-start').textContent='⏸ Pause';
+  document.getElementById('gd-step').disabled=true;
+  document.getElementById('gd-step10').disabled=true;
+  gdTimer=setInterval(()=>{ gdStep(); if(gdState.epoch>=1000){clearInterval(gdTimer);gdTimer=null;document.getElementById('gd-start').textContent='▶ Start Training';document.getElementById('gd-step').disabled=false;document.getElementById('gd-step10').disabled=false;} }, 40);
+});
+
+document.getElementById('gd-step').addEventListener('click', ()=>{ initGD(); gdStep(); });
+document.getElementById('gd-step10').addEventListener('click', ()=>{ initGD(); for(let i=0;i<10;i++) gdStep(); });
+
+document.getElementById('gd-reset').addEventListener('click', ()=>{
+  if(gdTimer){clearInterval(gdTimer);gdTimer=null;}
+  document.getElementById('gd-start').textContent='▶ Start Training';
+  document.getElementById('gd-step').disabled=false;
+  document.getElementById('gd-step10').disabled=false;
+  gdInited=false; initGD(); updateGDDisplay();
+});
+
+document.getElementById('dataset-sel').addEventListener('change', ()=>{
+  if(gdTimer){clearInterval(gdTimer);gdTimer=null;document.getElementById('gd-start').textContent='▶ Start Training';}
+  gdInited=false; initGD(); updateGDDisplay();
+});
+
+document.querySelectorAll('#opt-chip button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('#opt-chip button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    if(gdState){ gdState.m_w=gdState.m_b=gdState.v_w=gdState.v_b=0; }
+  });
+});
+
+// Init
+buildGraph();
+runForward();
+</script>
+</body>
+</html>
